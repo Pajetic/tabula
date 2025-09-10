@@ -8,20 +8,18 @@ partial struct UnitMovementSystem : ISystem {
     
     [BurstCompile]
     public void OnUpdate(ref SystemState state) {
-        foreach ((RefRW<LocalTransform> localTransform, RefRO<MoveSpeed> moveSpeed, RefRW<PhysicsVelocity> physicsVelocity) 
-                 in SystemAPI.Query<RefRW<LocalTransform>, RefRO<MoveSpeed>, RefRW<PhysicsVelocity>>()) {
+        foreach ((RefRW<LocalTransform> localTransform, RefRO<UnitMovement> unitMovement, RefRW<PhysicsVelocity> physicsVelocity) 
+                 in SystemAPI.Query<RefRW<LocalTransform>, RefRO<UnitMovement>, RefRW<PhysicsVelocity>>()) {
 
-            float3 targetPosition = MouseWorldPosition.Instance.GetPosition();
-            float3 moveDirection = math.normalize(targetPosition - localTransform.ValueRO.Position);
-
-            float rotationFactor = 10f; // TODO remove hardcoded value
+            float3 moveDirection = math.normalize(unitMovement.ValueRO.TargetPosition - localTransform.ValueRO.Position);
+            
             localTransform.ValueRW.Rotation = 
                 math.slerp(localTransform.ValueRO.Rotation,
                     quaternion.LookRotation(moveDirection, math.up()),
-                    rotationFactor * SystemAPI.Time.DeltaTime);
+                    unitMovement.ValueRO.RotationSpeed * SystemAPI.Time.DeltaTime);
             
             // Physics movement
-            physicsVelocity.ValueRW.Linear = moveDirection * moveSpeed.ValueRO.Value;
+            physicsVelocity.ValueRW.Linear = moveDirection * unitMovement.ValueRO.MoveSpeed;
             
             // Stop rotation on collisions
             physicsVelocity.ValueRW.Angular = float3.zero;

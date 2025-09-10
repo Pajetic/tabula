@@ -1,15 +1,15 @@
 using UnityEngine;
 
-public class MouseWorldPosition : MonoBehaviour {
+public class MousePositionManager : MonoBehaviour {
     
-    public static MouseWorldPosition Instance { get; private set; }
+    public static MousePositionManager Instance { get; private set; }
 
     private void Awake() {
         Instance = this;
     }
 
     public Vector3 GetPosition() {
-        // TODO Refator this later
+        // TODO Refactor this later
         Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
         Plane plane = new Plane(Vector3.up, Vector3.zero);
 
