@@ -10,7 +10,7 @@ public class UnitSelectionManager : MonoBehaviour {
             Vector3 mouseWorldPosition = MousePositionManager.Instance.GetPosition();
 
             EntityManager entityManager = World.DefaultGameObjectInjectionWorld.EntityManager;
-            EntityQuery entityQuery = new EntityQueryBuilder(Allocator.Temp).WithAll<UnitMovement>().Build(entityManager);
+            EntityQuery entityQuery = new EntityQueryBuilder(Allocator.Temp).WithAll<UnitMovement, Selected>().Build(entityManager);
             NativeArray<UnitMovement> unitMovementArray = entityQuery.ToComponentDataArray<UnitMovement>(Allocator.Temp);
             
             for (int i = 0; i < unitMovementArray.Length; i++) {
