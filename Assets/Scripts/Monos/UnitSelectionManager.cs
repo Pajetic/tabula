@@ -1,6 +1,7 @@
 using System;
 using Unity.Collections;
 using Unity.Entities;
+using Unity.Physics;
 using Unity.Transforms;
 using UnityEngine;
 
@@ -37,12 +38,38 @@ public class UnitSelectionManager : MonoBehaviour {
             NativeArray<Entity> entityArray = entityQuery.ToEntityArray(Allocator.Temp);
 
             Rect selectionArea = GetSelectionAreaRect();
+            float multiSelectMinSize = 40f; // TODO const
+            float selectionSize = selectionArea.height + selectionArea.width;
+            bool isMultiSelect = selectionSize > multiSelectMinSize;
             
-            for (int i = 0; i < localTransformArray.Length; i++) {
-                LocalTransform localTransform = localTransformArray[i];
-                Vector2 screenPosition = Camera.main.WorldToScreenPoint(localTransform.Position);
-                if (selectionArea.Contains(screenPosition)) {
-                    entityManager.SetComponentEnabled<Selected>(entityArray[i], true);
+            // Multi select with position check for larger boxes
+            if (isMultiSelect) {
+                for (int i = 0; i < localTransformArray.Length; i++) {
+                    LocalTransform localTransform = localTransformArray[i];
+                    Vector2 screenPosition = Camera.main.WorldToScreenPoint(localTransform.Position);
+                    if (selectionArea.Contains(screenPosition)) {
+                        entityManager.SetComponentEnabled<Selected>(entityArray[i], true);
+                    }
+                }
+            } else {    // Single selection with physics for clicks/small boxes
+                entityQuery = entityManager.CreateEntityQuery(typeof(PhysicsWorldSingleton));
+                PhysicsWorldSingleton physicsWorldSingleton = entityQuery.GetSingleton<PhysicsWorldSingleton>();
+                CollisionWorld collisionWorld = physicsWorldSingleton.CollisionWorld;
+                UnityEngine.Ray cameraMouseRay = Camera.main.ScreenPointToRay(Input.mousePosition); // TODO refactor input
+                int unitsLayer = 6;
+                RaycastInput raycastInput = new RaycastInput {
+                    Start = cameraMouseRay.GetPoint(0),
+                    End = cameraMouseRay.GetPoint(9999f),   // TODO const - just a large enough number to collide with ground plane
+                    Filter = new CollisionFilter {
+                        BelongsTo = ~0u,    // Every layer
+                        CollidesWith = 1u << unitsLayer,
+                        GroupIndex = 0,
+                    }
+                };
+                
+                if (collisionWorld.CastRay(raycastInput, out Unity.Physics.RaycastHit raycastHit)
+                    && entityManager.HasComponent<Unit>(raycastHit.Entity)) {
+                    entityManager.SetComponentEnabled<Selected>(raycastHit.Entity, true);
                 }
             }
 
