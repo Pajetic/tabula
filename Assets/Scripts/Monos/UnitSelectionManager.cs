@@ -30,13 +30,21 @@ public class UnitSelectionManager : MonoBehaviour {
             EntityManager entityManager = World.DefaultGameObjectInjectionWorld.EntityManager;
             
             // Deselect all units
-            EntityQuery entityQuery = new EntityQueryBuilder(Allocator.Temp).WithAll<LocalTransform, Unit>().WithAll<Selected>().Build(entityManager);
-            entityManager.SetComponentEnabled<Selected>(entityQuery, false);
+            EntityQuery entityQuery = new EntityQueryBuilder(Allocator.Temp).WithAll<Selected>().Build(entityManager);
+            NativeArray<Entity> entityArray = entityQuery.ToEntityArray(Allocator.Temp);
+            NativeArray<Selected> selectedArray = entityQuery.ToComponentDataArray<Selected>(Allocator.Temp);
+            for (int i = 0; i < entityArray.Length; i++) {
+                entityManager.SetComponentEnabled<Selected>(entityArray[i], false);
+                Selected selected = selectedArray[i];
+                selected.OnDeselected = true;
+                selectedArray[i] = selected;
+                entityManager.SetComponentData(entityArray[i], selected);   // cannot use CopyFromComponentData cuz component already disabled
+            }
             
             // Select units in selection rect
             entityQuery = new EntityQueryBuilder(Allocator.Temp).WithAll<LocalTransform, Unit>().WithPresent<Selected>().Build(entityManager);
             NativeArray<LocalTransform> localTransformArray = entityQuery.ToComponentDataArray<LocalTransform>(Allocator.Temp);
-            NativeArray<Entity> entityArray = entityQuery.ToEntityArray(Allocator.Temp);
+            entityArray = entityQuery.ToEntityArray(Allocator.Temp);
 
             Rect selectionArea = GetSelectionAreaRect();
             float multiSelectMinSize = 40f; // TODO const
@@ -50,6 +58,9 @@ public class UnitSelectionManager : MonoBehaviour {
                     Vector2 screenPosition = Camera.main.WorldToScreenPoint(localTransform.Position);
                     if (selectionArea.Contains(screenPosition)) {
                         entityManager.SetComponentEnabled<Selected>(entityArray[i], true);
+                        Selected selected = entityManager.GetComponentData<Selected>(entityArray[i]);
+                        selected.OnSelected = true;
+                        entityManager.SetComponentData(entityArray[i], selected);
                     }
                 }
             } else {    // Single selection with physics for clicks/small boxes
@@ -57,7 +68,7 @@ public class UnitSelectionManager : MonoBehaviour {
                 PhysicsWorldSingleton physicsWorldSingleton = entityQuery.GetSingleton<PhysicsWorldSingleton>();
                 CollisionWorld collisionWorld = physicsWorldSingleton.CollisionWorld;
                 UnityEngine.Ray cameraMouseRay = Camera.main.ScreenPointToRay(Input.mousePosition); // TODO refactor input
-                int unitsLayer = 6;
+                int unitsLayer = 6; // Units layer
                 RaycastInput raycastInput = new RaycastInput {
                     Start = cameraMouseRay.GetPoint(0),
                     End = cameraMouseRay.GetPoint(9999f),   // TODO const - just a large enough number to collide with ground plane
@@ -71,6 +82,9 @@ public class UnitSelectionManager : MonoBehaviour {
                 if (collisionWorld.CastRay(raycastInput, out Unity.Physics.RaycastHit raycastHit)
                     && entityManager.HasComponent<Unit>(raycastHit.Entity)) {
                     entityManager.SetComponentEnabled<Selected>(raycastHit.Entity, true);
+                    Selected selected = entityManager.GetComponentData<Selected>(raycastHit.Entity);
+                    selected.OnSelected = true;
+                    entityManager.SetComponentData(raycastHit.Entity, selected);
                 }
             }
 
